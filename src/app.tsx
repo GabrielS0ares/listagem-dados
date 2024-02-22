@@ -14,6 +14,8 @@ import {
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Pagination } from "./components/pagination";
 import { useSearchParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import useDebounceValue from "./hooks/use-debounce-value";
 
 export interface TagResponse {
   first: number;
@@ -33,14 +35,25 @@ export interface Tag {
 }
 
 export function App() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [filter, setFilter] = useState("");
+
+  const debouncedFilter = useDebounceValue(filter, 1000);
 
   const page = searchParams.get("page") ? Number(searchParams.get("page")) : 1;
+
+  useEffect(() => {
+    setSearchParams(params => {
+      params.set('page',"1")
+
+      return params
+    })
+  }, [debouncedFilter, setSearchParams]);
 
   const { data: tagsResponse, isLoading } = useQuery<TagResponse>({
     queryFn: async () => {
       const response = await fetch(
-        `http://localhost:3333/tags?_page=${page}&_per_page=10`
+        `http://localhost:3333/tags?_page=${page}&_per_page=10&title=${debouncedFilter}`
       );
       const data = await response.json();
       console.log("data", data);
@@ -48,7 +61,7 @@ export function App() {
       return data;
     },
     placeholderData: keepPreviousData,
-    queryKey: ["get-tags", page],
+    queryKey: ["get-tags", debouncedFilter, page],
   });
 
   if (isLoading) {
@@ -76,7 +89,11 @@ export function App() {
         <div className="flex items-center justify-between">
           <Input variant="filter">
             <Search className="size-3" />
-            <Control placeholder="Buscar Tags..." />
+            <Control
+              placeholder="Buscar Tags..."
+              onChange={(e) => setFilter(e.target.value)}
+              value={filter}
+            />
           </Input>
           <Button>
             Export
